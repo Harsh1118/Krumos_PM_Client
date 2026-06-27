@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useWorkspaces } from '../../../context/WorkspaceContext';
 import { useAuthStore } from '../../../store/authStore';
@@ -16,6 +16,18 @@ export const WorkspaceSelect: React.FC = () => {
   const [slug, setSlug] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // If the user has no workspaces but has a pending invite token, redirect them
+  // to the invite page so they can join the workspace they were invited to —
+  // instead of showing the "Create Workspace" form.
+  useEffect(() => {
+    if (!wsLoading && workspaces.length === 0) {
+      const pendingInviteToken = localStorage.getItem('krumos_pending_invite_token');
+      if (pendingInviteToken) {
+        navigate(`/invite/${pendingInviteToken}`, { replace: true });
+      }
+    }
+  }, [wsLoading, workspaces.length, navigate]);
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;

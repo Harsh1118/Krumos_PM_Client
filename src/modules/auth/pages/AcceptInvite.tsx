@@ -119,32 +119,19 @@ export const AcceptInvite: React.FC = () => {
             </p>
 
             {isAuthenticated && user ? (
-              user.email.toLowerCase() === (inviteInfo as InvitePayload).email.toLowerCase() ? (
-                /* Authenticated & Email Matches */
-                <div className="w-full flex flex-col gap-4 items-center">
-                  <p className="text-sm text-slate-300 leading-relaxed">
-                    You are logged in as <strong className="text-white">{user.email}</strong>. Ready to join?
-                  </p>
-                  <button
-                    onClick={handleAccept}
-                    disabled={accepting}
-                    className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-orange to-orange-hot text-white font-semibold px-6 py-3.5 rounded-xl shadow-lg hover:brightness-110 transition-all active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
-                  >
-                    {accepting ? 'Joining Workspace...' : 'Accept Invitation & Join'}
-                  </button>
-                </div>
-              ) : (
-                /* Authenticated but Email Mismatch */
-                <div className="w-full flex flex-col gap-4 items-center">
-                  <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-xl text-sm leading-relaxed text-left font-medium w-full">
-                    You are currently logged in as <strong className="text-white">{user.email}</strong>, which does not match
-                    the invitee email address ({(inviteInfo as InvitePayload).email}).
-                  </div>
-                  <p className="text-sm text-slate-350 leading-relaxed text-center">
-                    Please sign out and sign in using the correct account.
-                  </p>
-                </div>
-              )
+              /* Authenticated — let user attempt to accept; backend enforces email match */
+              <div className="w-full flex flex-col gap-4 items-center">
+                <p className="text-sm text-slate-300 leading-relaxed">
+                  You are logged in as <strong className="text-white">{user.email}</strong>. Ready to join?
+                </p>
+                <button
+                  onClick={handleAccept}
+                  disabled={accepting}
+                  className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-orange to-orange-hot text-white font-semibold px-6 py-3.5 rounded-xl shadow-lg hover:brightness-110 transition-all active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
+                >
+                  {accepting ? 'Joining Workspace...' : 'Accept Invitation & Join'}
+                </button>
+              </div>
             ) : (
               /* Unauthenticated: Prompt Login */
               <div className="w-full flex flex-col gap-4 items-center">

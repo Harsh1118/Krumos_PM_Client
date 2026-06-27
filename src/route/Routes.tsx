@@ -10,7 +10,7 @@ import { Login } from '../modules/auth/pages/Login';
 import { OAuthCallback } from '../modules/auth/pages/OAuthCallback';
 import { AcceptInvite } from '../modules/auth/pages/AcceptInvite';
 import { WorkspaceSelect } from '../modules/workspace/pages/WorkspaceSelect';
-import { Dashboard } from '../modules/dashboard/pages/Dashboard';
+import { Dashboard } from '../modules/Dashboard/pages/Dashboard';
 import { Projects } from '../modules/projects/pages/Projects';
 import { Board } from '../modules/board/pages/Board';
 import { Members } from '../modules/members/pages/Members';

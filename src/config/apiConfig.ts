@@ -1,4 +1,6 @@
 import { ENV } from './env.config';
+import { NetworkError, TimeoutError, ServerError } from '../network/errorClassifier';
+import { enqueueRequest } from '../network/offlineQueue';
 
 export interface ApiError extends Error {
   response?: {
@@ -28,6 +30,14 @@ const handleRequest = async (url: string, options: RequestInit & { data?: ApiBod
   const token = localStorage.getItem('krumos_token');
   const activeSlug = localStorage.getItem('krumos_active_workspace_slug');
 
+  // Pre-check online status
+  if (!navigator.onLine) {
+    if (options.method && options.method !== 'GET') {
+      enqueueRequest(url, options.method as any, options.data || null);
+    }
+    throw new NetworkError();
+  }
+
   const headers = new Headers(options.headers || {});
   if (token) {
     headers.set('Authorization', `Bearer ${token}`);
@@ -45,10 +55,14 @@ const handleRequest = async (url: string, options: RequestInit & { data?: ApiBod
     headers.set('Content-Type', 'application/json');
   }
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
+
   const fetchOptions: RequestInit = {
     ...options,
     body,
     headers,
+    signal: controller.signal,
   };
   
   const rawOptions = fetchOptions as Record<string, string | number | boolean | object | null | undefined>;
@@ -56,46 +70,74 @@ const handleRequest = async (url: string, options: RequestInit & { data?: ApiBod
     delete rawOptions.data;
   }
 
-  const response = await fetch(`${ENV.API_URL}${url}`, fetchOptions);
+  try {
+    const response = await fetch(`${ENV.API_URL}${url}`, fetchOptions);
+    clearTimeout(timeoutId);
 
-  if (response.status === 401) {
-    if (unauthorizedHandler) {
-      unauthorizedHandler();
-    }
-  }
-
-  if (!response.ok) {
-    let errorData = {};
-    try {
-      errorData = await response.json();
-    } catch (e) {
-      // ignore
-    }
-    const error = new Error(response.statusText) as ApiError;
-    error.response = {
-      data: errorData,
-      status: response.status,
-      statusText: response.statusText,
-    };
-    throw error;
-  }
-
-  const contentType = response.headers.get('content-type');
-  let data = null;
-  if (contentType && contentType.includes('application/json')) {
-    data = await response.json();
-  } else {
-    try {
-      const text = await response.text();
-      if (text) {
-        data = JSON.parse(text);
+    if (response.status === 401) {
+      if (unauthorizedHandler) {
+        unauthorizedHandler();
       }
-    } catch (e) {
-      // ignore
     }
-  }
 
-  return { data };
+    if (!response.ok) {
+      let errorData = {};
+      try {
+        errorData = await response.json();
+      } catch (e) {
+        // ignore
+      }
+
+      if (response.status >= 500) {
+        throw new ServerError(response.status, response.statusText);
+      }
+
+      const error = new Error(response.statusText) as ApiError;
+      error.response = {
+        data: errorData as { message?: string; [key: string]: unknown },
+        status: response.status,
+        statusText: response.statusText,
+      };
+      throw error;
+    }
+
+    const contentType = response.headers.get('content-type');
+    let data = null;
+    if (contentType && contentType.includes('application/json')) {
+      data = await response.json();
+    } else {
+      try {
+        const text = await response.text();
+        if (text) {
+          data = JSON.parse(text);
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    return { data };
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+
+    if (error.name === 'AbortError') {
+      throw new TimeoutError();
+    }
+
+    if (error instanceof NetworkError || error instanceof TimeoutError || error instanceof ServerError) {
+      throw error;
+    }
+
+    // General network failures (DNS lookup failed, server down, etc.)
+    if (!navigator.onLine) {
+      if (options.method && options.method !== 'GET') {
+        enqueueRequest(url, options.method as any, options.data || null);
+      }
+      throw new NetworkError();
+    }
+
+    throw new ServerError(503, 'Server unreachable or connection failed');
+  }
 };
 
 const api = {
@@ -106,6 +148,7 @@ const api = {
     return handleRequest(url, {
       method: 'POST',
       body: body ? JSON.stringify(body) : undefined,
+      data: body || undefined,
       ...config,
     });
   },
@@ -113,6 +156,7 @@ const api = {
     return handleRequest(url, {
       method: 'PATCH',
       body: body ? JSON.stringify(body) : undefined,
+      data: body || undefined,
       ...config,
     });
   },

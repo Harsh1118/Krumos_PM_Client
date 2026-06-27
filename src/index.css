@@ -1186,3 +1186,124 @@ select {
 *::-webkit-scrollbar-track {
   background: transparent;
 }
+
+/* ---------------------------------------------------------------
+   Network failure handling styles
+   --------------------------------------------------------------- */
+@utility offline-banner-wrapper {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  display: flex;
+  justify-content: center;
+  padding: 0.5rem 1rem;
+  pointer-events: none;
+  transition: transform 300ms cubic-bezier(0.16, 1, 0.3, 1), opacity 300ms ease;
+}
+
+@utility slide-down-active {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+@utility slide-up-inactive {
+  transform: translateY(-100%);
+  opacity: 0;
+}
+
+@utility offline-banner-container {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  background-color: var(--bone-2);
+  border: 1px solid var(--orange);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+  padding: 0.625rem 1.25rem;
+  border-radius: 9999px;
+  max-width: 90vw;
+}
+
+@utility offline-banner-text {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink);
+}
+
+@utility network-error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 3rem 1.5rem;
+  background-color: var(--bone-2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  max-width: 440px;
+  margin: 2rem auto;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+}
+
+@utility network-error-icon-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background-color: var(--ghost);
+  margin-bottom: 1.25rem;
+  transition: all 150ms;
+}
+
+@utility network-error-title {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: var(--ink);
+  margin: 0 0 0.5rem 0;
+  letter-spacing: -0.01em;
+}
+
+@utility network-error-message {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--mute);
+  margin: 0 0 1.25rem 0;
+}
+
+@utility network-error-retry-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.625rem 1.25rem;
+  border-radius: 6px;
+  border: 1px solid var(--line-strong);
+  background-color: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  transition: all 150ms ease;
+  
+  &:hover {
+    background-color: var(--ghost);
+  }
+  
+  &:active {
+    transform: scale(0.98);
+  }
+}
+
