@@ -6,9 +6,9 @@ import { useSocket } from '../../context/SocketContext';
 import {
   useNotificationsQuery,
   useMarkAllNotificationsReadMutation,
-  useMarkNotificationReadMutation,
-  Notification
+  useMarkNotificationReadMutation
 } from '../../api/notifications/useNotificationsApi';
+import type { Notification } from '../../api/notifications/useNotificationsApi';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '../../api/queryKeys';
 import {

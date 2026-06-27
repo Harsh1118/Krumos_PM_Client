@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../../config/apiConfig';
 import { queryKeys } from '../queryKeys';
 
-interface Notification {
+export interface Notification {
   id: string;
   message: string;
   type: string;
@@ -50,4 +50,4 @@ export const useMarkNotificationReadMutation = (slug?: string) => {
     },
   });
 };
-export type { Notification };
+

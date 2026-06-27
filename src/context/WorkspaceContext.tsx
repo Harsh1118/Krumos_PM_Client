@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import api from '../services/api';
-import { useAuth } from './AuthContext';
+import api from '../config/apiConfig';
+import { useAuthStore } from '../store/authStore';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 export type WorkspaceRole = 'ADMIN' | 'MANAGER' | 'MEMBER';
@@ -31,7 +31,7 @@ const WorkspaceContext = createContext<WorkspaceContextType | undefined>(undefin
 const EMPTY_WORKSPACES: Workspace[] = [];
 
 export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated } = useAuthStore();
   const queryClient = useQueryClient();
   const [activeWorkspace, setActiveWorkspace] = useState<Workspace | null>(null);
 

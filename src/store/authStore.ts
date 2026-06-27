@@ -25,6 +25,8 @@ let state: AuthState = {
   isLoading: true,
 };
 
+let isLoggingOut = false;
+
 try {
   const storedUser = localStorage.getItem('krumos_user');
   if (storedUser) {
@@ -41,9 +43,7 @@ state.isLoading = false;
 const listeners = new Set<() => void>();
 
 const emitChange = () => {
-  for (const listener of listeners) {
-    listener();
-  }
+  listeners.forEach((listener) => listener());
 };
 
 export const authStore = {
@@ -66,6 +66,8 @@ export const authStore = {
     emitChange();
   },
   async logout() {
+    if (isLoggingOut) return;
+    isLoggingOut = true;
     try {
       await api.post('/auth/logout');
     } catch (err) {
@@ -81,6 +83,7 @@ export const authStore = {
         isLoading: false,
       };
       emitChange();
+      isLoggingOut = false;
       window.location.href = '/login';
     }
   },

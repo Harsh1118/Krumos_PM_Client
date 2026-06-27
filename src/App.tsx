@@ -1,6 +1,5 @@
 import React from 'react';
 import { BrowserRouter } from 'react-router-dom';
-import { AuthProvider } from './context/AuthContext';
 import { WorkspaceProvider } from './context/WorkspaceContext';
 import { SocketProvider } from './context/SocketContext';
 import { ToastProvider } from './context/ToastContext';
@@ -9,18 +8,16 @@ import { AppRoutes } from './route/Routes';
 
 function App() {
   return (
-    <AuthProvider>
-      <WorkspaceProvider>
-        <SocketProvider>
-          <ToastProvider>
-            <BrowserRouter>
-              <AppRoutes />
-            </BrowserRouter>
-            <Toaster />
-          </ToastProvider>
-        </SocketProvider>
-      </WorkspaceProvider>
-    </AuthProvider>
+    <WorkspaceProvider>
+      <SocketProvider>
+        <ToastProvider>
+          <BrowserRouter>
+            <AppRoutes />
+          </BrowserRouter>
+          <Toaster />
+        </ToastProvider>
+      </SocketProvider>
+    </WorkspaceProvider>
   );
 }
 
