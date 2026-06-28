@@ -17,6 +17,11 @@ export type ApiBody = object | string | number | boolean | null;
 
 export interface ApiConfig extends Omit<RequestInit, 'method' | 'body'> {
   data?: ApiBody;
+  // When true, the request skips the offline queue (used by flushQueue itself)
+  skipQueue?: boolean;
+  // When true, the 401 interceptor will NOT attempt a silent token refresh.
+  // Use this for /auth/refresh and /auth/logout calls to avoid infinite loops.
+  skipRefresh?: boolean;
 }
 
 type UnauthorizedHandler = () => void;
@@ -26,14 +31,23 @@ export const setUnauthorizedHandler = (handler: UnauthorizedHandler) => {
   unauthorizedHandler = handler;
 };
 
-const handleRequest = async (url: string, options: RequestInit & { data?: ApiBody }) => {
+// Lazy-loaded reference to authStore.refresh() to break a circular dependency.
+// (apiConfig imports authStore, authStore imports apiConfig — this resolves it.)
+let refreshTokenFn: (() => Promise<string | null>) | null = null;
+export const setRefreshTokenFn = (fn: () => Promise<string | null>) => {
+  refreshTokenFn = fn;
+};
+
+const handleRequest = async (url: string, options: RequestInit & { data?: ApiBody; skipQueue?: boolean; skipRefresh?: boolean }) => {
   const token = localStorage.getItem('krumos_token');
   const activeSlug = localStorage.getItem('krumos_active_workspace_slug');
 
-  // Pre-check online status
+  // Pre-check online status. Only queue mutating requests (not GETs).
+  // Skip queueing when the request itself came from flushQueue to prevent the
+  // circular duplication loop (flushQueue → api → enqueueRequest → flushQueue).
   if (!navigator.onLine) {
-    if (options.method && options.method !== 'GET') {
-      enqueueRequest(url, options.method as any, options.data || null);
+    if (options.method && options.method !== 'GET' && !options.skipQueue) {
+      enqueueRequest(url, options.method as 'POST' | 'PATCH' | 'DELETE', options.data || null);
     }
     throw new NetworkError();
   }
@@ -63,18 +77,63 @@ const handleRequest = async (url: string, options: RequestInit & { data?: ApiBod
     body,
     headers,
     signal: controller.signal,
+    credentials: 'include', // Ensure cookies are sent and received in cross-origin requests
   };
-  
+
   const rawOptions = fetchOptions as Record<string, string | number | boolean | object | null | undefined>;
-  if ('data' in rawOptions) {
-    delete rawOptions.data;
-  }
+  if ('data' in rawOptions) delete rawOptions.data;
+  if ('skipQueue' in rawOptions) delete rawOptions.skipQueue;
+  if ('skipRefresh' in rawOptions) delete rawOptions.skipRefresh;
 
   try {
     const response = await fetch(`${ENV.API_URL}${url}`, fetchOptions);
     clearTimeout(timeoutId);
 
-    if (response.status === 401) {
+    if (response.status === 401 && !options.skipRefresh && refreshTokenFn) {
+      // Attempt a silent token refresh before triggering a global logout.
+      // This prevents users from being kicked out after the 15-minute access token expiry.
+      const newToken = await refreshTokenFn();
+      if (newToken) {
+        // Retry the original request once with the refreshed token
+        const retryHeaders = new Headers(headers);
+        retryHeaders.set('Authorization', `Bearer ${newToken}`);
+        const retryResponse = await fetch(`${ENV.API_URL}${url}`, {
+          ...fetchOptions,
+          headers: retryHeaders,
+        });
+
+        if (!retryResponse.ok) {
+          if (retryResponse.status === 401) {
+            // Refresh succeeded but the retry still got 401 — log out definitively
+            if (unauthorizedHandler) unauthorizedHandler();
+          }
+          const errorData = await retryResponse.json().catch(() => ({}));
+          const error = new Error(retryResponse.statusText) as ApiError;
+          error.response = {
+            data: errorData as { message?: string; [key: string]: unknown },
+            status: retryResponse.status,
+            statusText: retryResponse.statusText,
+          };
+          throw error;
+        }
+
+        const contentType = retryResponse.headers.get('content-type');
+        let data = null;
+        if (contentType?.includes('application/json')) {
+          data = await retryResponse.json();
+        }
+        return { data };
+      } else {
+        // Refresh failed — trigger logout (handled inside authStore.refresh)
+        if (unauthorizedHandler) unauthorizedHandler();
+        throw new Error('Session expired');
+      }
+    }
+
+    // Only trigger a global logout on 401 for real API calls.
+    // skipRefresh=true is set on /auth/logout and /auth/refresh to prevent
+    // an infinite loop: logout → 401 → unauthorizedHandler → logout → ...
+    if (response.status === 401 && !options.skipRefresh) {
       if (unauthorizedHandler) {
         unauthorizedHandler();
       }
@@ -117,10 +176,10 @@ const handleRequest = async (url: string, options: RequestInit & { data?: ApiBod
     }
 
     return { data };
-  } catch (error: any) {
+  } catch (error: unknown) {
     clearTimeout(timeoutId);
 
-    if (error.name === 'AbortError') {
+    if ((error as Error).name === 'AbortError') {
       throw new TimeoutError();
     }
 
@@ -130,8 +189,8 @@ const handleRequest = async (url: string, options: RequestInit & { data?: ApiBod
 
     // General network failures (DNS lookup failed, server down, etc.)
     if (!navigator.onLine) {
-      if (options.method && options.method !== 'GET') {
-        enqueueRequest(url, options.method as any, options.data || null);
+      if (options.method && options.method !== 'GET' && !options.skipQueue) {
+        enqueueRequest(url, options.method as 'POST' | 'PATCH' | 'DELETE', options.data || null);
       }
       throw new NetworkError();
     }

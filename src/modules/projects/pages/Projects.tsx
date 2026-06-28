@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useWorkspaces, WorkspaceRole } from '../../../context/WorkspaceContext';
 import {
   useProjectsQuery,
@@ -26,6 +26,7 @@ import type { Project, ApiError } from '../../../types';
 
 export const Projects: React.FC = () => {
   const { activeWorkspace } = useWorkspaces();
+  const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const toast = useToast();
 
@@ -44,8 +45,8 @@ export const Projects: React.FC = () => {
     activeWorkspace?.role === WorkspaceRole.ADMIN || activeWorkspace?.role === WorkspaceRole.MANAGER;
   const isAdmin = activeWorkspace?.role === WorkspaceRole.ADMIN;
 
-  // Fetch Projects using custom Query
-  const { data: projects = [], isLoading: loading } = useProjectsQuery(activeWorkspace?.slug);
+  // Fetch Projects using URL-driven slug
+  const { data: projects = [], isLoading: loading } = useProjectsQuery(slug);
 
   // Project Creation/Edit Mutations
   const createProjectMutation = useCreateProjectMutation();
@@ -76,11 +77,11 @@ export const Projects: React.FC = () => {
       return;
     }
 
-    if (!activeWorkspace?.slug) return;
+    if (!slug) return;
 
     if (modalMode === 'create') {
       createProjectMutation.mutate({
-        slug: activeWorkspace.slug,
+        slug: slug,
         name: name.trim(),
         description: description.trim(),
       }, {
@@ -96,7 +97,7 @@ export const Projects: React.FC = () => {
     } else {
       if (!selectedProject?.id) return;
       updateProjectMutation.mutate({
-        slug: activeWorkspace.slug,
+        slug: slug,
         projectId: selectedProject.id,
         name: name.trim(),
         description: description.trim(),
@@ -115,9 +116,9 @@ export const Projects: React.FC = () => {
 
   // Archive/Restore Mutation
   const handleArchiveToggle = async (project: Project) => {
-    if (!activeWorkspace?.slug) return;
+    if (!slug) return;
     updateProjectMutation.mutate({
-      slug: activeWorkspace.slug,
+      slug: slug,
       projectId: project.id,
       name: project.name,
       description: project.description,
@@ -140,10 +141,10 @@ export const Projects: React.FC = () => {
       `Are you absolutely sure you want to delete the project "${project.name}"?\nThis will permanently delete all tasks, comments, and activity logs. This action is irreversible.`,
     );
 
-    if (!confirmDelete || !activeWorkspace?.slug) return;
+    if (!confirmDelete || !slug) return;
 
     deleteProjectMutation.mutate({
-      slug: activeWorkspace.slug,
+      slug: slug,
       projectId: project.id,
     }, {
       onSuccess: () => {
@@ -156,7 +157,7 @@ export const Projects: React.FC = () => {
   };
 
   const handleNavigateToBoard = (projectId: string) => {
-    navigate(`/w/${activeWorkspace?.slug}/projects/${projectId}`);
+    navigate(`/w/${slug}/projects/${projectId}`);
   };
 
   const filteredProjects = projects.filter((p) => p.isArchived === showArchived);

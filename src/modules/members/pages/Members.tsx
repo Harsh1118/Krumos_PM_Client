@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useParams } from 'react-router-dom';
 import { useWorkspaces, WorkspaceRole } from '../../../context/WorkspaceContext';
 import api from '../../../config/apiConfig';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -18,6 +19,7 @@ import type { Member, Invitation, ApiError } from '../../../types';
 
 export const Members: React.FC = () => {
   const { activeWorkspace } = useWorkspaces();
+  const { slug } = useParams<{ slug: string }>();
   const queryClient = useQueryClient();
   const toast = useToast();
 
@@ -30,28 +32,28 @@ export const Members: React.FC = () => {
 
   // Fetch active contributors
   const { data: members = [], isLoading: membersLoading } = useQuery<Member[]>({
-    queryKey: ['workspaceMembers', activeWorkspace?.slug],
+    queryKey: ['workspaceMembers', slug],
     queryFn: async () => {
-      const res = await api.get(`/workspaces/${activeWorkspace?.slug}/members`);
+      const res = await api.get(`/workspaces/${slug}/members`);
       return res.data;
     },
-    enabled: !!activeWorkspace?.slug,
+    enabled: !!slug,
   });
 
   // Fetch pending invitations
   const { data: invitations = [], isLoading: invitationsLoading } = useQuery<Invitation[]>({
-    queryKey: ['workspaceInvitations', activeWorkspace?.slug],
+    queryKey: ['workspaceInvitations', slug],
     queryFn: async () => {
-      const res = await api.get(`/workspaces/${activeWorkspace?.slug}/invitations`);
+      const res = await api.get(`/workspaces/${slug}/invitations`);
       return res.data;
     },
-    enabled: !!activeWorkspace?.slug && isAdmin,
+    enabled: !!slug && isAdmin,
   });
 
   // Invite Mutation
   const inviteMutation = useMutation({
     mutationFn: async ({ email, role }: { email: string; role: WorkspaceRole }) => {
-      const res = await api.post(`/workspaces/${activeWorkspace?.slug}/invitations`, {
+      const res = await api.post(`/workspaces/${slug}/invitations`, {
         email,
         role,
       });
@@ -61,7 +63,7 @@ export const Members: React.FC = () => {
       toast.success(`Invitation successfully sent to ${newInvite.email}`);
       setEmail('');
       setRole(WorkspaceRole.MEMBER);
-      queryClient.invalidateQueries({ queryKey: ['workspaceInvitations', activeWorkspace?.slug] });
+      queryClient.invalidateQueries({ queryKey: ['workspaceInvitations', slug] });
       setIsModalOpen(false);
     },
     onError: (err: ApiError) => {
@@ -91,18 +93,18 @@ export const Members: React.FC = () => {
   // Role Change Mutation (Optimistic Update)
   const roleChangeMutation = useMutation({
     mutationFn: async ({ userId, newRole }: { userId: string; newRole: WorkspaceRole }) => {
-      const res = await api.patch(`/workspaces/${activeWorkspace?.slug}/members/${userId}`, {
+      const res = await api.patch(`/workspaces/${slug}/members/${userId}`, {
         role: newRole,
       });
       return res.data;
     },
     onMutate: async ({ userId, newRole }) => {
-      await queryClient.cancelQueries({ queryKey: ['workspaceMembers', activeWorkspace?.slug] });
-      const previousMembers = queryClient.getQueryData<Member[]>(['workspaceMembers', activeWorkspace?.slug]);
+      await queryClient.cancelQueries({ queryKey: ['workspaceMembers', slug] });
+      const previousMembers = queryClient.getQueryData<Member[]>(['workspaceMembers', slug]);
 
       if (previousMembers) {
         queryClient.setQueryData<Member[]>(
-          ['workspaceMembers', activeWorkspace?.slug],
+          ['workspaceMembers', slug],
           previousMembers.map((m) => (m.user.id === userId ? { ...m, role: newRole } : m))
         );
       }
@@ -111,7 +113,7 @@ export const Members: React.FC = () => {
     },
     onError: (err: ApiError, _variables, context) => {
       if (context?.previousMembers) {
-        queryClient.setQueryData(['workspaceMembers', activeWorkspace?.slug], context.previousMembers);
+        queryClient.setQueryData(['workspaceMembers', slug], context.previousMembers);
       }
       toast.error(err.response?.data?.message || 'Failed to update member role');
     },
@@ -119,7 +121,7 @@ export const Members: React.FC = () => {
       toast.success('Member role updated successfully');
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['workspaceMembers', activeWorkspace?.slug] });
+      queryClient.invalidateQueries({ queryKey: ['workspaceMembers', slug] });
     }
   });
 
@@ -130,15 +132,15 @@ export const Members: React.FC = () => {
   // Remove Member Mutation (Optimistic Update)
   const removeMemberMutation = useMutation({
     mutationFn: async (userId: string) => {
-      await api.delete(`/workspaces/${activeWorkspace?.slug}/members/${userId}`);
+      await api.delete(`/workspaces/${slug}/members/${userId}`);
     },
     onMutate: async (userId) => {
-      await queryClient.cancelQueries({ queryKey: ['workspaceMembers', activeWorkspace?.slug] });
-      const previousMembers = queryClient.getQueryData<Member[]>(['workspaceMembers', activeWorkspace?.slug]);
+      await queryClient.cancelQueries({ queryKey: ['workspaceMembers', slug] });
+      const previousMembers = queryClient.getQueryData<Member[]>(['workspaceMembers', slug]);
 
       if (previousMembers) {
         queryClient.setQueryData<Member[]>(
-          ['workspaceMembers', activeWorkspace?.slug],
+          ['workspaceMembers', slug],
           previousMembers.filter((m) => m.user.id !== userId)
         );
       }
@@ -147,7 +149,7 @@ export const Members: React.FC = () => {
     },
     onError: (err: ApiError, _variables, context) => {
       if (context?.previousMembers) {
-        queryClient.setQueryData(['workspaceMembers', activeWorkspace?.slug], context.previousMembers);
+        queryClient.setQueryData(['workspaceMembers', slug], context.previousMembers);
       }
       toast.error(err.response?.data?.message || 'Failed to remove member');
     },
@@ -155,7 +157,7 @@ export const Members: React.FC = () => {
       toast.success('Member removed successfully');
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['workspaceMembers', activeWorkspace?.slug] });
+      queryClient.invalidateQueries({ queryKey: ['workspaceMembers', slug] });
     }
   });
 
@@ -172,15 +174,15 @@ export const Members: React.FC = () => {
   // Revoke Invitation Mutation (Optimistic Update)
   const revokeInviteMutation = useMutation({
     mutationFn: async (inviteId: string) => {
-      await api.delete(`/workspaces/${activeWorkspace?.slug}/invitations/${inviteId}`);
+      await api.delete(`/workspaces/${slug}/invitations/${inviteId}`);
     },
     onMutate: async (inviteId) => {
-      await queryClient.cancelQueries({ queryKey: ['workspaceInvitations', activeWorkspace?.slug] });
-      const previousInvites = queryClient.getQueryData<Invitation[]>(['workspaceInvitations', activeWorkspace?.slug]);
+      await queryClient.cancelQueries({ queryKey: ['workspaceInvitations', slug] });
+      const previousInvites = queryClient.getQueryData<Invitation[]>(['workspaceInvitations', slug]);
 
       if (previousInvites) {
         queryClient.setQueryData<Invitation[]>(
-          ['workspaceInvitations', activeWorkspace?.slug],
+          ['workspaceInvitations', slug],
           previousInvites.filter((i) => i.id !== inviteId)
         );
       }
@@ -189,7 +191,7 @@ export const Members: React.FC = () => {
     },
     onError: (err: ApiError, _variables, context) => {
       if (context?.previousInvites) {
-        queryClient.setQueryData(['workspaceInvitations', activeWorkspace?.slug], context.previousInvites);
+        queryClient.setQueryData(['workspaceInvitations', slug], context.previousInvites);
       }
       toast.error(err.response?.data?.message || 'Failed to revoke invitation');
     },
@@ -197,7 +199,7 @@ export const Members: React.FC = () => {
       toast.success('Invitation cancelled successfully');
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['workspaceInvitations', activeWorkspace?.slug] });
+      queryClient.invalidateQueries({ queryKey: ['workspaceInvitations', slug] });
     }
   });
 

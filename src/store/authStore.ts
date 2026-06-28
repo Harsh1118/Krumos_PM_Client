@@ -27,6 +27,9 @@ let state: AuthState = {
 
 let isLoggingOut = false;
 
+// Shared promise to prevent multiple simultaneous refresh calls (token refresh race condition guard)
+let refreshPromise: Promise<string | null> | null = null;
+
 try {
   const storedUser = localStorage.getItem('krumos_user');
   if (storedUser) {
@@ -69,7 +72,8 @@ export const authStore = {
     if (isLoggingOut) return;
     isLoggingOut = true;
     try {
-      await api.post('/auth/logout');
+      // skipRefresh prevents the refresh interceptor from firing during logout
+      await api.post('/auth/logout', undefined, { skipRefresh: true });
     } catch (err) {
       console.error('Failed to log out on server', err);
     } finally {
@@ -86,6 +90,47 @@ export const authStore = {
       isLoggingOut = false;
       window.location.href = '/login';
     }
+  },
+  // Silently refreshes the access token using the HTTP-only refresh cookie.
+  // Returns the new access token or null if refresh fails.
+  // A shared promise prevents multiple simultaneous refresh calls (race condition guard).
+  // NOTE: Do NOT call authStore.logout() here — the apiConfig interceptor handles
+  // the null return value by calling unauthorizedHandler(), avoiding a double logout.
+  async refresh(): Promise<string | null> {
+    // Do not attempt refresh while a logout is already in progress
+    if (isLoggingOut) return null;
+
+    if (refreshPromise) {
+      return refreshPromise;
+    }
+
+    refreshPromise = api
+      .post('/auth/refresh', undefined, { skipRefresh: true })
+      .then((res) => {
+        const newToken: string = res.data.token;
+        const updatedUser: User = res.data.user;
+        localStorage.setItem('krumos_token', newToken);
+        localStorage.setItem('krumos_user', JSON.stringify(updatedUser));
+        state = {
+          token: newToken,
+          user: updatedUser,
+          isAuthenticated: true,
+          isLoading: false,
+        };
+        emitChange();
+        return newToken;
+      })
+      .catch((err) => {
+        console.error('Silent token refresh failed:', err);
+        // Return null — the apiConfig 401 interceptor will call unauthorizedHandler()
+        // which triggers authStore.logout(). Do not call logout() here to avoid a loop.
+        return null;
+      })
+      .finally(() => {
+        refreshPromise = null;
+      });
+
+    return refreshPromise;
   },
   async googleLogin(code: string) {
     state = { ...state, isLoading: true };
@@ -112,6 +157,7 @@ export const useAuthStore = () => {
     ...currentState,
     login: authStore.login,
     logout: authStore.logout,
+    refresh: authStore.refresh,
     googleLogin: authStore.googleLogin,
   };
 };

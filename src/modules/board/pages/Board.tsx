@@ -155,7 +155,25 @@ export const Board: React.FC = () => {
     }
   }, [autoTaskId, tasks, selectedTask]);
 
-  // 4. WebSocket Live Receivers - Invalidate Cache on Server Notification
+  // Sync the open task sidebar when the tasks list is refetched (e.g. from a WebSocket event).
+  // This prevents stale data in the sidebar from overwriting a change made by another user.
+  // We only update if the user is not actively editing the title or description fields.
+  useEffect(() => {
+    if (!selectedTask || tasks.length === 0) return;
+    const freshTask = tasks.find((t: Task) => t.id === selectedTask.id);
+    if (!freshTask) return;
+
+    const isTitleActive = document.activeElement?.getAttribute('placeholder') === 'Task Title';
+    const isDescActive = document.activeElement?.tagName === 'TEXTAREA';
+
+    setSelectedTask(freshTask);
+    if (!isTitleActive) setEditTitle(freshTask.title);
+    if (!isDescActive) setEditDesc(freshTask.description || '');
+  // tasks is the only dep needed; selectedTask ref is read but not a change driver here
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tasks]);
+
+
   useEffect(() => {
     if (socket) {
       const handleTaskChange = () => {

@@ -65,9 +65,9 @@ export const clearQueuedRequest = (id: string): void => {
 };
 
 export const flushQueue = async (api: {
-  post: (url: string, body?: any) => Promise<any>;
-  patch: (url: string, body?: any) => Promise<any>;
-  delete: (url: string) => Promise<any>;
+  post: (url: string, body?: any, config?: any) => Promise<any>;
+  patch: (url: string, body?: any, config?: any) => Promise<any>;
+  delete: (url: string, config?: any) => Promise<any>;
 }): Promise<void> => {
   const queue = getOfflineQueue();
   if (queue.length === 0) return;
@@ -78,11 +78,11 @@ export const flushQueue = async (api: {
   for (const item of items) {
     try {
       if (item.method === 'POST') {
-        await api.post(item.url, item.body);
+        await api.post(item.url, item.body, { skipQueue: true });
       } else if (item.method === 'PATCH') {
-        await api.patch(item.url, item.body);
+        await api.patch(item.url, item.body, { skipQueue: true });
       } else if (item.method === 'DELETE') {
-        await api.delete(item.url);
+        await api.delete(item.url, { skipQueue: true });
       }
       clearQueuedRequest(item.id);
       console.log(`Successfully synced queued request ${item.id}: ${item.method} ${item.url}`);
