@@ -34,6 +34,7 @@ export const NetworkStatusProvider: React.FC<{ children: React.ReactNode }> = ({
         console.error('Failed initial queue sync', err);
       });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -43,6 +44,7 @@ export const NetworkStatusProvider: React.FC<{ children: React.ReactNode }> = ({
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useNetwork = (): NetworkStatusContextType => {
   const context = useContext(NetworkStatusContext);
   if (!context) {

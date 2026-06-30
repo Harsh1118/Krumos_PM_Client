@@ -29,7 +29,9 @@ export const AcceptInvite: React.FC = () => {
   useEffect(() => {
     if (verifyError) {
       const apiErr = verifyError as ApiError;
-      setError(apiErr.response?.data?.message || 'Invalid or expired invitation link');
+      setTimeout(() => {
+        setError(apiErr.response?.data?.message || 'Invalid or expired invitation link');
+      }, 0);
     }
   }, [verifyError]);
 

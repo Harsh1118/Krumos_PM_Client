@@ -2,7 +2,7 @@ export interface QueuedRequest {
   id: string;
   url: string;
   method: 'POST' | 'PATCH' | 'DELETE';
-  body: any;
+  body: unknown;
   timestamp: number;
 }
 
@@ -12,7 +12,7 @@ export const getOfflineQueue = (): QueuedRequest[] => {
   try {
     const data = localStorage.getItem(QUEUE_KEY);
     return data ? JSON.parse(data) : [];
-  } catch (e) {
+  } catch {
     return [];
   }
 };
@@ -28,7 +28,7 @@ export const saveOfflineQueue = (queue: QueuedRequest[]): void => {
 export const enqueueRequest = (
   url: string,
   method: 'POST' | 'PATCH' | 'DELETE',
-  body: any
+  body: unknown
 ): void => {
   const queue = getOfflineQueue();
 
@@ -64,11 +64,8 @@ export const clearQueuedRequest = (id: string): void => {
   saveOfflineQueue(filtered);
 };
 
-export const flushQueue = async (api: {
-  post: (url: string, body?: any, config?: any) => Promise<any>;
-  patch: (url: string, body?: any, config?: any) => Promise<any>;
-  delete: (url: string, config?: any) => Promise<any>;
-}): Promise<void> => {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const flushQueue = async (api: any): Promise<void> => {
   const queue = getOfflineQueue();
   if (queue.length === 0) return;
 
@@ -86,10 +83,11 @@ export const flushQueue = async (api: {
       }
       clearQueuedRequest(item.id);
       console.log(`Successfully synced queued request ${item.id}: ${item.method} ${item.url}`);
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error(`Failed to sync queued request ${item.id}: ${item.method} ${item.url}`, e);
       
-      const status = e?.response?.status;
+      const err = e as { response?: { status?: number } };
+      const status = err?.response?.status;
       // Discard invalid requests (4xx status, excluding auth/timeout retryable statuses)
       if (status && status >= 400 && status < 500 && status !== 401 && status !== 408 && status !== 429) {
         clearQueuedRequest(item.id);

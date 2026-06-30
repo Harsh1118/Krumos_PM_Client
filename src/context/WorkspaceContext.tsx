@@ -4,6 +4,7 @@ import { useAuthStore } from '../store/authStore';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 export type WorkspaceRole = 'ADMIN' | 'MANAGER' | 'MEMBER';
+// eslint-disable-next-line react-refresh/only-export-components
 export const WorkspaceRole = {
   ADMIN: 'ADMIN' as const,
   MANAGER: 'MANAGER' as const,
@@ -52,22 +53,28 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   useEffect(() => {
     if (!isAuthenticated) {
-      setActiveWorkspace(null);
+      setTimeout(() => {
+        setActiveWorkspace(null);
+      }, 0);
       return;
     }
 
     if (workspaces.length > 0) {
       const storedSlug = localStorage.getItem('krumos_active_workspace_slug');
       const found = workspaces.find((w) => w.slug === storedSlug);
-      if (found) {
-        setActiveWorkspace(found);
-      } else {
-        setActiveWorkspace(workspaces[0]);
-        localStorage.setItem('krumos_active_workspace_slug', workspaces[0].slug);
-      }
+      setTimeout(() => {
+        if (found) {
+          setActiveWorkspace(found);
+        } else {
+          setActiveWorkspace(workspaces[0]);
+          localStorage.setItem('krumos_active_workspace_slug', workspaces[0].slug);
+        }
+      }, 0);
     } else {
-      setActiveWorkspace(null);
-      localStorage.removeItem('krumos_active_workspace_slug');
+      setTimeout(() => {
+        setActiveWorkspace(null);
+        localStorage.removeItem('krumos_active_workspace_slug');
+      }, 0);
     }
   }, [workspaces, isAuthenticated]);
 
@@ -114,6 +121,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useWorkspaces = () => {
   const context = useContext(WorkspaceContext);
   if (!context) {

@@ -92,15 +92,19 @@ export const AuthenticatedUserLayout: React.FC = () => {
   // Close sidebar on route change for mobile/tablet viewports
   useEffect(() => {
     if (window.innerWidth <= 1280) {
-      setSidebarOpen(false);
+      setTimeout(() => {
+        setSidebarOpen(false);
+      }, 0);
     }
   }, [location.pathname]);
 
   // Close dropdowns when sidebar is closed
   useEffect(() => {
     if (!sidebarOpen) {
-      setShowWorkspaceDropdown(false);
-      setShowProfileDropdown(false);
+      setTimeout(() => {
+        setShowWorkspaceDropdown(false);
+        setShowProfileDropdown(false);
+      }, 0);
     }
   }, [sidebarOpen]);
 

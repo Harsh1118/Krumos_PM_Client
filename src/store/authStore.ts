@@ -35,7 +35,7 @@ try {
   if (storedUser) {
     state.user = JSON.parse(storedUser);
   }
-} catch (e) {
+} catch {
   localStorage.removeItem('krumos_token');
   localStorage.removeItem('krumos_user');
   state.token = null;

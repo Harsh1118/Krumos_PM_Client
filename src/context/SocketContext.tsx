@@ -20,8 +20,10 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (!isAuthenticated || !token) {
       if (socket) {
         socket.disconnect();
-        setSocket(null);
-        setIsConnected(false);
+        setTimeout(() => {
+          setSocket(null);
+          setIsConnected(false);
+        }, 0);
       }
       return;
     }
@@ -49,11 +51,14 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setIsConnected(false);
     });
 
-    setSocket(newSocket);
+    setTimeout(() => {
+      setSocket(newSocket);
+    }, 0);
 
     return () => {
       newSocket.disconnect();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, token]);
 
   // Handle active workspace room changes
@@ -62,7 +67,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       console.log(`Joining workspace socket channel: ${activeWorkspace.slug}`);
       socket.emit('join_workspace', activeWorkspace.slug);
     }
-  }, [socket, isConnected, activeWorkspace?.slug]);
+  }, [socket, isConnected, activeWorkspace]);
 
   return (
     <SocketContext.Provider value={{ socket, isConnected }}>
@@ -71,6 +76,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useSocket = () => {
   const context = useContext(SocketContext);
   if (!context) {

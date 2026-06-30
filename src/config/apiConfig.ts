@@ -143,7 +143,7 @@ const handleRequest = async (url: string, options: RequestInit & { data?: ApiBod
       let errorData = {};
       try {
         errorData = await response.json();
-      } catch (e) {
+      } catch {
         // ignore
       }
 
@@ -170,7 +170,7 @@ const handleRequest = async (url: string, options: RequestInit & { data?: ApiBod
         if (text) {
           data = JSON.parse(text);
         }
-      } catch (e) {
+      } catch {
         // ignore
       }
     }

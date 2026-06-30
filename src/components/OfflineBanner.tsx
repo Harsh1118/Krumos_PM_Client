@@ -8,7 +8,7 @@ export const OfflineBanner: React.FC = () => {
 
   useEffect(() => {
     if (!isOnline) {
-      setShouldShow(true);
+      setTimeout(() => setShouldShow(true), 0);
     } else {
       // Wait for slide-out animation to finish
       const timer = setTimeout(() => setShouldShow(false), 500);
