@@ -10,16 +10,32 @@ let exchangedCode: string | null = null;
 export const OAuthCallback: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { login } = useAuthStore();
+  const { login, isAuthenticated } = useAuthStore();
 
-  // The GET /auth/google/callback redirect now returns a short-lived one-time
-  // state ?code= instead of the raw access token.
-  // We exchange it here via POST to prevent token exposure in browser history.
   const code = searchParams.get('code');
+
+  // Handle redirection as soon as authentication state becomes true.
+  // This is highly robust against React StrictMode unmount-remount cycles,
+  // ensuring the currently active/mounted component instance handles navigation.
+  useEffect(() => {
+    if (isAuthenticated) {
+      const pendingInviteToken = localStorage.getItem('krumos_pending_invite_token');
+      if (pendingInviteToken) {
+        localStorage.removeItem('krumos_pending_invite_token');
+        navigate(`/invite/${pendingInviteToken}`, { replace: true });
+      } else {
+        navigate('/workspaces', { replace: true });
+      }
+    }
+  }, [isAuthenticated, navigate]);
 
   useEffect(() => {
     if (!code) {
-      navigate('/login?error=missing_code');
+      navigate('/login?error=missing_code', { replace: true });
+      return;
+    }
+
+    if (isAuthenticated) {
       return;
     }
 
@@ -33,23 +49,15 @@ export const OAuthCallback: React.FC = () => {
       .post('/auth/google/exchange', { code }, { skipRefresh: true })
       .then((res) => {
         login(res.data.token, res.data.user);
-
-        const pendingInviteToken = localStorage.getItem('krumos_pending_invite_token');
-        if (pendingInviteToken) {
-          localStorage.removeItem('krumos_pending_invite_token');
-          navigate(`/invite/${pendingInviteToken}`);
-        } else {
-          navigate('/workspaces');
-        }
       })
       .catch((err) => {
         // Reset the tracker on error to allow retry if the user retries manually
         exchangedCode = null;
         console.error('Failed to exchange OAuth code', err);
-        navigate('/login?error=oauth_exchange_failed');
+        navigate('/login?error=oauth_exchange_failed', { replace: true });
       });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [code]);
+  }, [code, isAuthenticated]);
 
   return (
     <div className="layout-loading">
@@ -59,4 +67,3 @@ export const OAuthCallback: React.FC = () => {
   );
 };
 export default OAuthCallback;
-

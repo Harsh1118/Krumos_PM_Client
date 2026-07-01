@@ -1,10 +1,27 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import api from '../../../config/apiConfig';
 import krumosLogo from '../../../assets/krumos_logo.svg';
 
 export const Login: React.FC = () => {
+  const [searchParams] = useSearchParams();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const errCode = searchParams.get('error');
+    if (errCode) {
+      if (errCode === 'oauth_failed') {
+        setError('Google authentication failed. Please try again.');
+      } else if (errCode === 'oauth_exchange_failed') {
+        setError('Failed to complete secure sign-in. Please try again.');
+      } else if (errCode === 'missing_code') {
+        setError('Authorization code is missing. Please try again.');
+      } else {
+        setError('An unexpected authentication error occurred.');
+      }
+    }
+  }, [searchParams]);
 
   const handleGoogleLogin = async () => {
     setLoading(true);
