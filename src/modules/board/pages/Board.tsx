@@ -3,8 +3,18 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import { useWorkspaces, WorkspaceRole } from '../../../context/WorkspaceContext';
 import { useAuthStore } from '../../../store/authStore';
 import { useSocket } from '../../../context/SocketContext';
-import api from '../../../config/apiConfig';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
+import { useProjectDetailsQuery } from '../../../api/projects/useProjectsApi';
+import { useMembersQuery } from '../../../api/workspace/useWorkspaceApi';
+import {
+  useBoardTasksQuery,
+  useTaskCommentsQuery,
+  useTaskActivityQuery,
+  useCreateTaskMutation,
+  useUpdateTaskMutation,
+  useDeleteTaskMutation,
+  useAddCommentMutation,
+} from '../../../api/tasks/useTasksApi';
 import { useToast } from '../../../context/ToastContext';
 import { BoardSkeleton } from '../../../components/ui/Skeleton';
 
@@ -15,7 +25,7 @@ import { KanbanColumn } from '../components/KanbanColumn';
 import { TaskDetailsDrawer } from '../components/TaskDetailsDrawer';
 import { CreateTaskModal } from '../components/CreateTaskModal';
 
-import type { Task, BoardMember as Member, Comment, ActivityLog, ApiError } from '../../../types';
+import type { Task, BoardMember as Member } from '../../../types';
 
 const EMPTY_TASKS: Task[] = [];
 
@@ -69,66 +79,31 @@ export const Board: React.FC = () => {
   }, []);
 
   // 1. Fetch Project Details
-  const { data: projectDetails } = useQuery<{ id: string; name: string }>({
-    queryKey: ['projectDetails', activeWorkspace?.slug, projectId],
-    queryFn: async () => {
-      const res = await api.get(`/workspaces/${activeWorkspace?.slug}/projects/${projectId}`);
-      return res.data;
-    },
-    enabled: !!activeWorkspace && !!projectId,
-  });
-
+  const { data: projectDetails } = useProjectDetailsQuery(activeWorkspace?.slug, projectId);
   const projectName = projectDetails?.name || 'Project Board';
 
   // 2. Fetch Workspace Members
-  const { data: members = [] } = useQuery<Member[]>({
-    queryKey: ['workspaceMembers', activeWorkspace?.slug],
-    queryFn: async () => {
-      const res = await api.get(`/workspaces/${activeWorkspace?.slug}/members`);
-      return res.data;
-    },
-    enabled: !!activeWorkspace,
-  });
+  const { data: members = [] } = useMembersQuery(activeWorkspace?.slug) as { data?: Member[] };
 
   // 3. Fetch Tasks
-  const { data: queryTasks, isLoading: loading } = useQuery<Task[]>({
-    queryKey: ['boardTasks', activeWorkspace?.slug, projectId, { filterAssignee, filterPriority, filterDueDate, searchQuery }],
-    queryFn: async () => {
-      const q = new URLSearchParams();
-      if (filterAssignee) q.append('assigneeId', filterAssignee);
-      if (filterPriority) q.append('priority', filterPriority);
-      if (filterDueDate) q.append('dueDate', filterDueDate);
-      if (searchQuery) q.append('search', searchQuery);
-
-      const res = await api.get(
-        `/workspaces/${activeWorkspace?.slug}/projects/${projectId}/tasks?${q.toString()}`,
-      );
-      return res.data;
+  const { data: queryTasks, isLoading: loading } = useBoardTasksQuery(
+    activeWorkspace?.slug,
+    projectId,
+    {
+      assigneeId: filterAssignee,
+      priority: filterPriority,
+      dueDate: filterDueDate,
+      search: searchQuery,
     },
-    enabled: !!activeWorkspace && !!projectId,
-  });
-
+    !!activeWorkspace && !!projectId
+  );
   const tasks = queryTasks || EMPTY_TASKS;
 
-  // Fetch comments via TanStack Query
-  const { data: comments = [] } = useQuery<Comment[]>({
-    queryKey: ['taskComments', selectedTask?.id],
-    queryFn: async () => {
-      const res = await api.get(`/workspaces/${activeWorkspace?.slug}/tasks/${selectedTask?.id}/comments`);
-      return res.data;
-    },
-    enabled: !!activeWorkspace && !!selectedTask?.id,
-  });
+  // Fetch comments
+  const { data: comments = [] } = useTaskCommentsQuery(activeWorkspace?.slug, selectedTask?.id);
 
-  // Fetch activity logs via TanStack Query
-  const { data: activityLogs = [] } = useQuery<ActivityLog[]>({
-    queryKey: ['taskActivity', selectedTask?.id],
-    queryFn: async () => {
-      const res = await api.get(`/workspaces/${activeWorkspace?.slug}/tasks/${selectedTask?.id}/activity`);
-      return res.data;
-    },
-    enabled: !!activeWorkspace && !!selectedTask?.id,
-  });
+  // Fetch activity logs
+  const { data: activityLogs = [] } = useTaskActivityQuery(activeWorkspace?.slug, selectedTask?.id);
 
   // Auto-open selected task from URL query parameters
   const autoTaskId = searchParams.get('taskId');
@@ -188,26 +163,7 @@ export const Board: React.FC = () => {
   }, [socket, queryClient]);
 
   // 5. Create Task Mutation & Action
-  const createTaskMutation = useMutation({
-    mutationFn: async (fields: { title: string; description?: string; assigneeId?: string; priority: string; dueDate?: string }) => {
-      const res = await api.post(`/workspaces/${activeWorkspace?.slug}/projects/${projectId}/tasks`, fields);
-      return res.data;
-    },
-    onSuccess: (newTask) => {
-      setIsCreateOpen(false);
-      setCreateTitle('');
-      setCreateDesc('');
-      setCreateAssignee('');
-      setCreatePriority('MEDIUM');
-      setCreateDueDate('');
-      toast.success(`Task "${newTask.title}" created successfully`);
-      queryClient.invalidateQueries({ queryKey: ['boardTasks'] });
-    },
-    onError: (err) => {
-      toast.error('Failed to create task');
-      console.error(err);
-    }
-  });
+  const createTaskMutation = useCreateTaskMutation(activeWorkspace?.slug, projectId);
 
   const creating = createTaskMutation.isPending;
 
@@ -221,61 +177,45 @@ export const Board: React.FC = () => {
       assigneeId: createAssignee || undefined,
       priority: createPriority,
       dueDate: createDueDate || undefined,
+    }, {
+      onSuccess: (newTask) => {
+        setIsCreateOpen(false);
+        setCreateTitle('');
+        setCreateDesc('');
+        setCreateAssignee('');
+        setCreatePriority('MEDIUM');
+        setCreateDueDate('');
+        toast.success(`Task "${newTask.title}" created successfully`);
+      },
+      onError: (err) => {
+        toast.error('Failed to create task');
+        console.error(err);
+      }
     });
   };
 
-  // 6. Update Task Mutation (Optimistic Update)
-  const updateTaskMutation = useMutation({
-    mutationFn: async ({ taskId, fields }: { taskId: string; fields: Partial<Task> }) => {
-      const res = await api.patch(`/workspaces/${activeWorkspace?.slug}/tasks/${taskId}`, fields);
-      return res.data;
-    },
-    onMutate: async ({ taskId, fields }) => {
-      await queryClient.cancelQueries({ queryKey: ['boardTasks'] });
-      
-      const queryKey = ['boardTasks', activeWorkspace?.slug, projectId, { filterAssignee, filterPriority, filterDueDate, searchQuery }];
-      const previousTasks = queryClient.getQueryData<Task[]>(queryKey);
-
-      if (previousTasks) {
-        queryClient.setQueryData<Task[]>(
-          queryKey,
-          previousTasks.map((t) => (t.id === taskId ? { ...t, ...fields } : t))
-        );
-      }
-
-      const previousSelectedTask = selectedTask;
-      if (selectedTask && selectedTask.id === taskId) {
-        setSelectedTask((curr) => curr ? { ...curr, ...fields } as Task : null);
-      }
-
-      return { previousTasks, previousSelectedTask, queryKey };
-    },
-    onError: (err: ApiError, _variables, context) => {
-      if (context?.previousTasks && context.queryKey) {
-        queryClient.setQueryData(context.queryKey, context.previousTasks);
-      }
-      if (context?.previousSelectedTask) {
-        setSelectedTask(context.previousSelectedTask);
-      }
-      toast.error(err.response?.data?.message || 'Failed to update task');
-    },
-    onSuccess: (updatedTask) => {
-      setSelectedTask((curr) => {
-        if (curr && curr.id === updatedTask.id) {
-          setEditTitle(updatedTask.title);
-          setEditDesc(updatedTask.description || '');
-          return updatedTask;
-        }
-        return curr;
-      });
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['boardTasks'] });
-    }
-  });
+  // 6. Update Task Mutation
+  const updateTaskMutation = useUpdateTaskMutation(activeWorkspace?.slug, projectId);
 
   const handleUpdateTaskField = async (taskId: string, fields: Partial<Task>) => {
-    updateTaskMutation.mutate({ taskId, fields });
+    updateTaskMutation.mutate({
+      taskId,
+      fields
+    }, {
+      onSuccess: (updatedTask) => {
+        setSelectedTask((curr) => {
+          if (curr && curr.id === updatedTask.id) {
+            setEditTitle(updatedTask.title);
+            setEditDesc(updatedTask.description || '');
+            return updatedTask;
+          }
+          return curr;
+        });
+      },
+      onError: (err: any) => {
+        toast.error(err.response?.data?.message || 'Failed to update task');
+      }
+    });
   };
 
   // 7. HTML5 Drag & Drop Handlers
@@ -353,95 +293,24 @@ export const Board: React.FC = () => {
     await handleUpdateTaskField(selectedTask.id, { description: editDesc.trim() || undefined });
   };
 
-  // Post Comment Mutation (Optimistic Update)
-  const addCommentMutation = useMutation({
-    mutationFn: async (content: string) => {
-      const res = await api.post(
-        `/workspaces/${activeWorkspace?.slug}/tasks/${selectedTask?.id}/comments`,
-        { content }
-      );
-      return res.data;
-    },
-    onMutate: async (content) => {
-      await queryClient.cancelQueries({ queryKey: ['taskComments', selectedTask?.id] });
-      const previousComments = queryClient.getQueryData<Comment[]>(['taskComments', selectedTask?.id]);
-
-      if (previousComments && currentUser) {
-        const tempComment: Comment = {
-          id: Math.random().toString(),
-          content,
-          createdAt: new Date().toISOString(),
-          user: {
-            id: currentUser.id,
-            name: currentUser.name,
-            avatarUrl: currentUser.avatarUrl,
-          }
-        };
-        queryClient.setQueryData<Comment[]>(
-          ['taskComments', selectedTask?.id],
-          [...(previousComments || []), tempComment]
-        );
-      }
-
-      return { previousComments };
-    },
-    onError: (_err, _content, context) => {
-      if (context?.previousComments) {
-        queryClient.setQueryData(['taskComments', selectedTask?.id], context.previousComments);
-      }
-      toast.error('Failed to post comment');
-    },
-    onSuccess: () => {
-      setNewCommentText('');
-      queryClient.invalidateQueries({ queryKey: ['taskComments', selectedTask?.id] });
-      queryClient.invalidateQueries({ queryKey: ['taskActivity', selectedTask?.id] });
-    }
-  });
+  // Post Comment Mutation
+  const addCommentMutation = useAddCommentMutation(activeWorkspace?.slug, selectedTask?.id, currentUser);
 
   const handleAddComment = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCommentText.trim() || !selectedTask) return;
-    addCommentMutation.mutate(newCommentText.trim());
+    addCommentMutation.mutate(newCommentText.trim(), {
+      onSuccess: () => {
+        setNewCommentText('');
+      },
+      onError: () => {
+        toast.error('Failed to post comment');
+      }
+    });
   };
 
-  // Delete Task Mutation (Optimistic Update)
-  const deleteTaskMutation = useMutation({
-    mutationFn: async () => {
-      await api.delete(`/workspaces/${activeWorkspace?.slug}/tasks/${selectedTask?.id}`);
-    },
-    onMutate: async () => {
-      await queryClient.cancelQueries({ queryKey: ['boardTasks'] });
-      const queryKey = ['boardTasks', activeWorkspace?.slug, projectId, { filterAssignee, filterPriority, filterDueDate, searchQuery }];
-      const previousTasks = queryClient.getQueryData<Task[]>(queryKey);
-
-      if (previousTasks && selectedTask) {
-        queryClient.setQueryData<Task[]>(
-          queryKey,
-          previousTasks.filter((t) => t.id !== selectedTask.id)
-        );
-      }
-
-      const previousSelectedTask = selectedTask;
-      handleCloseDetails();
-
-      return { previousTasks, previousSelectedTask, queryKey };
-    },
-    onError: (_err, _variables, context) => {
-      if (context?.previousTasks && context.queryKey) {
-        queryClient.setQueryData(context.queryKey, context.previousTasks);
-      }
-      if (context?.previousSelectedTask) {
-        setSelectedTask(context.previousSelectedTask);
-      }
-      toast.error('Failed to delete task');
-    },
-    onSuccess: () => {
-      toast.success('Task deleted successfully');
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['boardTasks'] });
-    }
-  });
+  // Delete Task Mutation
+  const deleteTaskMutation = useDeleteTaskMutation(activeWorkspace?.slug, projectId);
 
   const handleDeleteTask = () => {
     if (!selectedTask) return;
@@ -449,7 +318,17 @@ export const Board: React.FC = () => {
       `Are you sure you want to delete this task? This cannot be undone.`,
     );
     if (!confirmDelete) return;
-    deleteTaskMutation.mutate();
+
+    const previousSelected = selectedTask;
+    handleCloseDetails();
+
+    deleteTaskMutation.mutate(selectedTask.id, {
+      onError: () => {
+        setSelectedTask(previousSelected);
+        setSearchParams({ taskId: previousSelected.id });
+        toast.error('Failed to delete task');
+      }
+    });
   };
 
   const columns: { title: string; status: Task['status'] }[] = [

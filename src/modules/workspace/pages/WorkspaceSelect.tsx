@@ -7,7 +7,7 @@ import type { ApiError } from '../../../types';
 import krumosLogo from '../../../assets/krumos_logo.svg';
 
 export const WorkspaceSelect: React.FC = () => {
-  const { workspaces, createWorkspace, isLoading: wsLoading } = useWorkspaces();
+  const { workspaces, createWorkspace, isLoading: wsLoading, error: workspacesError } = useWorkspaces();
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
 
@@ -113,9 +113,9 @@ export const WorkspaceSelect: React.FC = () => {
           </div>
         </div>
 
-        {error && (
+        {(error || workspacesError) && (
           <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-3 rounded-none text-sm leading-relaxed text-center font-medium">
-            {error}
+            {error || (workspacesError as ApiError).response?.data?.message || workspacesError?.message || 'Failed to fetch workspaces'}
           </div>
         )}
 

@@ -22,6 +22,7 @@ import { CardSkeleton } from '../../../components/ui/Skeleton';
 import { LoadingButton } from '../../../components/ui/LoadingButton';
 import { ResponsiveModal } from '../../../components/ui/ResponsiveModal';
 import { formatActivityTime } from '../../../utils';
+import { PageContainer } from '../../../components/common/PageContainer';
 import type { Project, ApiError } from '../../../types';
 
 export const Projects: React.FC = () => {
@@ -162,41 +163,36 @@ export const Projects: React.FC = () => {
 
   const filteredProjects = projects.filter((p) => p.isArchived === showArchived);
 
+  const headerActions = (
+    <>
+      <button
+        onClick={() => setShowArchived(!showArchived)}
+        className="btn btn-secondary flex items-center gap-2"
+        disabled={loading}
+      >
+        {showArchived ? <FolderOpen size={16} /> : <Archive size={16} />}
+        <span>{showArchived ? 'Show Active' : 'Show Archived'}</span>
+      </button>
+
+      {isManagerOrAdmin && (
+        <button
+          onClick={handleOpenCreateModal}
+          className="btn btn-primary flex items-center gap-2"
+          disabled={loading}
+        >
+          <Plus size={16} />
+          <span>Create Project</span>
+        </button>
+      )}
+    </>
+  );
+
   return (
-    <div className="flex flex-col w-full page-enter">
-      {/* Page Header */}
-      <div className="flex justify-between items-end border-b-2 border-line-strong pb-5 mb-8 flex-wrap gap-4">
-        <div>
-          <h1 className="page-title text-3xl font-extrabold tracking-tight font-display text-ink uppercase">
-            Projects
-          </h1>
-          <p className="eyebrow text-mute text-[11px] mt-1">
-            Manage your workspace projects and sprint scopes
-          </p>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setShowArchived(!showArchived)}
-            className="btn btn-secondary flex items-center gap-2"
-            disabled={loading}
-          >
-            {showArchived ? <FolderOpen size={16} /> : <Archive size={16} />}
-            <span>{showArchived ? 'Show Active' : 'Show Archived'}</span>
-          </button>
-
-          {isManagerOrAdmin && (
-            <button
-              onClick={handleOpenCreateModal}
-              className="btn btn-primary flex items-center gap-2"
-              disabled={loading}
-            >
-              <Plus size={16} />
-              <span>Create Project</span>
-            </button>
-          )}
-        </div>
-      </div>
+    <PageContainer
+      title="Projects"
+      subtitle="Manage your workspace projects and sprint scopes"
+      headerActions={headerActions}
+    >
 
       {/* Projects Grid */}
       {loading ? (
@@ -391,7 +387,7 @@ export const Projects: React.FC = () => {
           </div>
         </form>
       </ResponsiveModal>
-    </div>
+    </PageContainer>
   );
 };
 export default Projects;

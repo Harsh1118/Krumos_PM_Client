@@ -5,7 +5,8 @@ import api from '../../../config/apiConfig';
 
 // Module-level tracking to prevent duplicate code exchange requests during
 // React StrictMode's mount-unmount-remount cycles in development.
-let exchangedCode: string | null = null;
+let activeExchangePromise: Promise<{ token: string; user: any }> | null = null;
+let activeExchangeCode: string | null = null;
 
 export const OAuthCallback: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -39,25 +40,39 @@ export const OAuthCallback: React.FC = () => {
       return;
     }
 
-    // If we already initiated the exchange for this code, skip it
-    if (exchangedCode === code) {
-      return;
-    }
-    exchangedCode = code;
+    let isSubscribed = true;
 
-    api
-      .post('/auth/google/exchange', { code }, { skipRefresh: true })
-      .then((res) => {
-        login(res.data.token, res.data.user);
+    // Initiate the exchange promise if it hasn't been started for this code yet
+    if (activeExchangeCode !== code) {
+      activeExchangeCode = code;
+      activeExchangePromise = api
+        .post('/auth/google/exchange', { code }, { skipRefresh: true })
+        .then((res) => res.data)
+        .catch((err) => {
+          activeExchangePromise = null;
+          activeExchangeCode = null;
+          throw err;
+        });
+    }
+
+    // Subscribe the active component instance to the pending promise
+    activeExchangePromise
+      ?.then((data) => {
+        if (isSubscribed) {
+          login(data.token, data.user);
+        }
       })
       .catch((err) => {
-        // Reset the tracker on error to allow retry if the user retries manually
-        exchangedCode = null;
-        console.error('Failed to exchange OAuth code', err);
-        navigate('/login?error=oauth_exchange_failed', { replace: true });
+        if (isSubscribed) {
+          console.error('Failed to exchange OAuth code', err);
+          navigate('/login?error=oauth_exchange_failed', { replace: true });
+        }
       });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [code, isAuthenticated]);
+
+    return () => {
+      isSubscribed = false;
+    };
+  }, [code, isAuthenticated, navigate, login]);
 
   return (
     <div className="layout-loading">

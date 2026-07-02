@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import api from '../../../config/apiConfig';
 import krumosLogo from '../../../assets/krumos_logo.svg';
+import { AuthLayout } from '../../../components/common/AuthLayout';
 
 export const Login: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -38,12 +39,7 @@ export const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-slate-950 px-4 relative overflow-hidden select-none">
-      {/* Dynamic atmospheric mesh background blobs */}
-      <div className="absolute -top-1/4 -left-1/4 w-[600px] h-[600px] bg-[#F44E14]/10 rounded-full blur-[120px] pointer-events-none" />
-      <div className="absolute -bottom-1/4 -right-1/4 w-[700px] h-[700px] bg-indigo-500/10 rounded-full blur-[140px] pointer-events-none" />
-      <div className="absolute top-1/3 left-1/3 w-[500px] h-[500px] bg-purple-600/5 rounded-full blur-[110px] pointer-events-none" />
-
+    <AuthLayout selectNone>
       {/* Glassmorphic card */}
       <div 
         className="w-full max-w-md bg-slate-950/30 backdrop-blur-[24px] border border-white/[0.08] rounded-2xl shadow-[0_30px_70px_rgba(0,0,0,0.8),_0_0_50px_rgba(244,78,20,0.05)] hover:shadow-[0_30px_70px_rgba(0,0,0,0.85),_0_0_50px_rgba(244,78,20,0.12)] transition-all duration-500 hover:border-white/[0.14] hover:scale-[1.01] relative z-10 flex flex-col gap-9 p-10 pb-14"
@@ -101,7 +97,7 @@ export const Login: React.FC = () => {
           <span className="text-sm tracking-wide">Sign In With Google</span>
         </button>
       </div>
-    </div>
+    </AuthLayout>
   );
 };
 export default Login;

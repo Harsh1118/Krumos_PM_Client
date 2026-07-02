@@ -23,6 +23,7 @@ interface WorkspaceContextType {
   workspaces: Workspace[];
   activeWorkspace: Workspace | null;
   isLoading: boolean;
+  error: Error | null;
   switchWorkspace: (slug: string) => void;
   refreshWorkspaces: () => Promise<void>;
   createWorkspace: (name: string, slug: string) => Promise<Workspace>;
@@ -36,7 +37,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const queryClient = useQueryClient();
   const [activeWorkspace, setActiveWorkspace] = useState<Workspace | null>(null);
 
-  const { data: queryData, isLoading } = useQuery<Workspace[]>({
+  const { data: queryData, isLoading, error } = useQuery<Workspace[]>({
     queryKey: ['workspaces'],
     queryFn: async () => {
       const res = await api.get('/workspaces');
@@ -111,6 +112,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         workspaces,
         activeWorkspace,
         isLoading,
+        error: error as Error | null,
         switchWorkspace,
         refreshWorkspaces,
         createWorkspace,

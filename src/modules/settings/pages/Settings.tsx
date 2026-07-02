@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { useWorkspaces, WorkspaceRole } from '../../../context/WorkspaceContext';
-import api from '../../../config/apiConfig';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useUpdateWorkspaceMutation, useDeleteWorkspaceMutation } from '../../../api/workspace/useWorkspaceApi';
 import { AlertTriangle, Save, Trash2 } from 'lucide-react';
+import { PageContainer } from '../../../components/common/PageContainer';
 import type { ApiError } from '../../../types';
 
 export const Settings: React.FC = () => {
@@ -40,34 +40,14 @@ interface SettingsFormProps {
 
 const SettingsForm: React.FC<SettingsFormProps> = ({ activeWorkspace }) => {
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
+  const updateWorkspaceMutation = useUpdateWorkspaceMutation();
+  const deleteWorkspaceMutation = useDeleteWorkspaceMutation();
 
   const [name, setName] = useState(activeWorkspace.name);
   const [logoUrl, setLogoUrl] = useState(activeWorkspace.logoUrl || '');
-  const [confirmSlug, setConfirmSlug] = useState('');
-
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
-
-  // Update Settings Mutation
-  const updateWorkspaceMutation = useMutation({
-    mutationFn: async ({ name, logoUrl }: { name: string; logoUrl: string | null }) => {
-      await api.patch(`/workspaces/${activeWorkspace.slug}`, {
-        name,
-        logoUrl,
-      });
-    },
-    onSuccess: async () => {
-      setSuccess('Workspace settings saved successfully');
-      await queryClient.invalidateQueries({ queryKey: ['workspaces'] });
-    },
-    onError: (err: ApiError) => {
-      setError(err.response?.data?.message || 'Failed to update workspace');
-    }
-  });
 
   const saving = updateWorkspaceMutation.isPending;
+  const deleting = deleteWorkspaceMutation.isPending;
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,28 +60,21 @@ const SettingsForm: React.FC<SettingsFormProps> = ({ activeWorkspace }) => {
     }
 
     updateWorkspaceMutation.mutate({
-      name: name.trim(),
-      logoUrl: logoUrl.trim() || null
+      slug: activeWorkspace.slug,
+      data: {
+        name: name.trim(),
+        logoUrl: logoUrl.trim() || null
+      }
+    }, {
+      onSuccess: () => {
+        setSuccess('Workspace settings saved successfully');
+      },
+      onError: (err) => {
+        const apiErr = err as ApiError;
+        setError(apiErr.response?.data?.message || 'Failed to update workspace');
+      }
     });
   };
-
-  // Delete Workspace Mutation
-  const deleteWorkspaceMutation = useMutation({
-    mutationFn: async (confirmSlug: string) => {
-      await api.delete(`/workspaces/${activeWorkspace.slug}`, {
-        data: { confirmSlug },
-      });
-    },
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['workspaces'] });
-      navigate('/workspaces');
-    },
-    onError: (err: ApiError) => {
-      setDeleteError(err.response?.data?.message || 'Failed to delete workspace');
-    }
-  });
-
-  const deleting = deleteWorkspaceMutation.isPending;
 
   const handleDelete = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -112,21 +85,31 @@ const SettingsForm: React.FC<SettingsFormProps> = ({ activeWorkspace }) => {
       return;
     }
 
-    deleteWorkspaceMutation.mutate(confirmSlug);
+    deleteWorkspaceMutation.mutate({
+      slug: activeWorkspace.slug,
+      confirmSlug,
+    }, {
+      onSuccess: () => {
+        navigate('/workspaces');
+      },
+      onError: (err) => {
+        const apiErr = err as ApiError;
+        setDeleteError(apiErr.response?.data?.message || 'Failed to delete workspace');
+      }
+    });
   };
 
-  return (
-    <div className="flex flex-col w-full page-enter">
-      {/* Page Header */}
-      <div className="border-b-2 border-line-strong pb-5 mb-8">
-        <h1 className="page-title text-3xl font-extrabold tracking-tight font-display text-ink uppercase">
-          Workspace Settings
-        </h1>
-        <p className="eyebrow text-mute mt-1 text-[11px]">
-          Configure workspace meta and system properties
-        </p>
-      </div>
+  // Declare local state hooks
+  const [confirmSlug, setConfirmSlug] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
+  return (
+    <PageContainer
+      title="Workspace Settings"
+      subtitle="Configure workspace meta and system properties"
+    >
       {/* Settings Cards Column */}
       <div className="flex flex-col gap-6 max-w-[600px]">
 
@@ -271,6 +254,6 @@ const SettingsForm: React.FC<SettingsFormProps> = ({ activeWorkspace }) => {
           </div>
         </div>
       </div>
-    </div>
+    </PageContainer>
   );
 };

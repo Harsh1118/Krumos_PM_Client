@@ -37,7 +37,35 @@ export const useUpdateWorkspaceMutation = () => {
       const res = await api.patch(`/workspaces/${slug}`, data);
       return res.data;
     },
-    onSuccess: (_, variables) => {
+    onMutate: async ({ slug, data }) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.workspaces });
+      await queryClient.cancelQueries({ queryKey: queryKeys.workspaceDetails(slug) });
+
+      const previousWorkspaces = queryClient.getQueryData<Workspace[]>(queryKeys.workspaces);
+      const previousDetails = queryClient.getQueryData<Workspace>(queryKeys.workspaceDetails(slug));
+
+      queryClient.setQueryData<Workspace[]>(queryKeys.workspaces, (old) =>
+        old?.map((w) => (w.slug === slug ? { ...w, ...data } : w))
+      );
+
+      if (previousDetails) {
+        queryClient.setQueryData<Workspace>(queryKeys.workspaceDetails(slug), {
+          ...previousDetails,
+          ...data,
+        });
+      }
+
+      return { previousWorkspaces, previousDetails, slug };
+    },
+    onError: (_err, _variables, context) => {
+      if (context?.previousWorkspaces) {
+        queryClient.setQueryData(queryKeys.workspaces, context.previousWorkspaces);
+      }
+      if (context?.previousDetails) {
+        queryClient.setQueryData(queryKeys.workspaceDetails(context.slug), context.previousDetails);
+      }
+    },
+    onSettled: (_, __, variables) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.workspaces });
       queryClient.invalidateQueries({ queryKey: queryKeys.workspaceDetails(variables.slug) });
     },
@@ -47,10 +75,26 @@ export const useUpdateWorkspaceMutation = () => {
 export const useDeleteWorkspaceMutation = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (slug: string) => {
-      await api.delete(`/workspaces/${slug}`);
+    mutationFn: async ({ slug, confirmSlug }: { slug: string; confirmSlug: string }) => {
+      await api.delete(`/workspaces/${slug}`, { data: { confirmSlug } });
     },
-    onSuccess: () => {
+    onMutate: async ({ slug }) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.workspaces });
+
+      const previousWorkspaces = queryClient.getQueryData<Workspace[]>(queryKeys.workspaces);
+
+      queryClient.setQueryData<Workspace[]>(queryKeys.workspaces, (old) =>
+        old?.filter((w) => w.slug !== slug)
+      );
+
+      return { previousWorkspaces };
+    },
+    onError: (_err, _variables, context) => {
+      if (context?.previousWorkspaces) {
+        queryClient.setQueryData(queryKeys.workspaces, context.previousWorkspaces);
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.workspaces });
     },
   });

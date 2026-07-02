@@ -17,7 +17,7 @@ export const useBoardTasksQuery = (
   enabled = true
 ) => {
   return useQuery<Task[]>({
-    queryKey: queryKeys.tasks(slug, projectId),
+    queryKey: queryKeys.tasks(slug, projectId, params),
     queryFn: async () => {
       const q = new URLSearchParams();
       if (params.assigneeId) q.append('assigneeId', params.assigneeId);
@@ -69,7 +69,42 @@ export const useCreateTaskMutation = (slug?: string, projectId?: string) => {
       const res = await api.post(`/workspaces/${slug}/projects/${projectId}/tasks`, fields);
       return res.data;
     },
-    onSuccess: () => {
+    onMutate: async (fields) => {
+      const queryKey = queryKeys.tasks(slug, projectId);
+      await queryClient.cancelQueries({ queryKey });
+
+      const previousTasks = queryClient.getQueryData<Task[]>(queryKey);
+
+      const tempTask: Task = {
+        id: `temp-${Date.now()}`,
+        title: fields.title,
+        description: fields.description || null,
+        status: 'TODO',
+        priority: fields.priority as Task['priority'],
+        dueDate: fields.dueDate || null,
+        order: previousTasks ? previousTasks.length + 1 : 1,
+        projectId: projectId || '',
+        assigneeId: fields.assigneeId || null,
+        assignee: undefined,
+        reporterId: 'temp-user-id',
+        reporter: { id: 'temp-user-id', name: 'You' },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      queryClient.setQueryData<Task[]>(queryKey, (old) => [
+        ...(old || []),
+        tempTask,
+      ]);
+
+      return { previousTasks, queryKey };
+    },
+    onError: (_err, _variables, context) => {
+      if (context?.previousTasks && context.queryKey) {
+        queryClient.setQueryData(context.queryKey, context.previousTasks);
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.tasks(slug, projectId) });
     },
   });
@@ -82,21 +117,76 @@ export const useUpdateTaskMutation = (slug?: string, projectId?: string) => {
       const res = await api.patch(`/workspaces/${slug}/tasks/${taskId}`, fields);
       return res.data;
     },
-    onSuccess: (updatedTask) => {
+    onMutate: async ({ taskId, fields }) => {
+      // Use general query key since filters might vary, cancel active boards queries
+      const queryKey = queryKeys.tasks(slug, projectId);
+      await queryClient.cancelQueries({ queryKey });
+
+      // Find the exact query cache entries matching the key prefix
+      const queries = queryClient.getQueriesData<Task[]>({ queryKey });
+      const previousState = queries.map(([key, value]) => ({ key, value }));
+
+      // Update all matching query caches to ensure it works with active filter states
+      queries.forEach(([key, old]) => {
+        if (old) {
+          queryClient.setQueryData<Task[]>(
+            key,
+            old.map((t) => (t.id === taskId ? { ...t, ...fields } : t))
+          );
+        }
+      });
+
+      return { previousState };
+    },
+    onError: (_err, _variables, context) => {
+      context?.previousState.forEach(({ key, value }) => {
+        queryClient.setQueryData(key, value);
+      });
+    },
+    onSettled: (updatedTask) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.tasks(slug, projectId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.taskActivity(slug, updatedTask.id) });
+      if (updatedTask) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.taskActivity(slug, updatedTask.id) });
+      }
     },
   });
 };
 
-export const useAddCommentMutation = (slug?: string, taskId?: string) => {
+export const useAddCommentMutation = (slug?: string, taskId?: string, currentUser?: any) => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (content: string) => {
       const res = await api.post(`/workspaces/${slug}/tasks/${taskId}/comments`, { content });
       return res.data;
     },
-    onSuccess: () => {
+    onMutate: async (content) => {
+      const queryKey = queryKeys.taskComments(slug, taskId);
+      await queryClient.cancelQueries({ queryKey });
+
+      const previousComments = queryClient.getQueryData<Comment[]>(queryKey);
+
+      if (previousComments && currentUser) {
+        const tempComment: Comment = {
+          id: `temp-${Date.now()}`,
+          content,
+          createdAt: new Date().toISOString(),
+          user: {
+            id: currentUser.id,
+            name: currentUser.name,
+            avatarUrl: currentUser.avatarUrl,
+          },
+        };
+        queryClient.setQueryData<Comment[]>(queryKey, [...(previousComments || []), tempComment]);
+      }
+
+      return { previousComments, queryKey };
+    },
+    onError: (_err, _variables, context) => {
+      if (context?.previousComments && context.queryKey) {
+        queryClient.setQueryData(context.queryKey, context.previousComments);
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.taskComments(slug, taskId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.taskActivity(slug, taskId) });
     },
@@ -109,7 +199,31 @@ export const useDeleteTaskMutation = (slug?: string, projectId?: string) => {
     mutationFn: async (taskId: string) => {
       await api.delete(`/workspaces/${slug}/tasks/${taskId}`);
     },
-    onSuccess: () => {
+    onMutate: async (taskId) => {
+      const queryKey = queryKeys.tasks(slug, projectId);
+      await queryClient.cancelQueries({ queryKey });
+
+      // Find all queries matching this project's tasks to clear optimistically
+      const queries = queryClient.getQueriesData<Task[]>({ queryKey });
+      const previousState = queries.map(([key, value]) => ({ key, value }));
+
+      queries.forEach(([key, old]) => {
+        if (old) {
+          queryClient.setQueryData<Task[]>(
+            key,
+            old.filter((t) => t.id !== taskId)
+          );
+        }
+      });
+
+      return { previousState };
+    },
+    onError: (_err, _variables, context) => {
+      context?.previousState.forEach(({ key, value }) => {
+        queryClient.setQueryData(key, value);
+      });
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.tasks(slug, projectId) });
     },
   });

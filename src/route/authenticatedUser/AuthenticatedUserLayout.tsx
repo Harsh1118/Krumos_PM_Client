@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import krumosLogo from '../../assets/krumos_logo.svg';
 import { formatActivityTime } from '../../utils';
+import { Tooltip } from '../../components/ui/Tooltip';
 
 export const AuthenticatedUserLayout: React.FC = () => {
   const { user, logout } = useAuthStore();
@@ -113,6 +114,11 @@ export const AuthenticatedUserLayout: React.FC = () => {
 
   // Sync URL slug with Active Workspace in Context
   useEffect(() => {
+    if (!wsLoading && workspaces.length === 0) {
+      navigate('/workspaces');
+      return;
+    }
+
     if (slug && workspaces.length > 0) {
       const match = workspaces.find((w) => w.slug === slug);
       if (match) {
@@ -249,24 +255,25 @@ export const AuthenticatedUserLayout: React.FC = () => {
 
         {/* Workspace Switcher */}
         <div className="workspace-switcher-container" ref={workspaceDropdownRef}>
-          <button
-            className="workspace-switcher-btn"
-            onClick={() => sidebarOpen && setShowWorkspaceDropdown(!showWorkspaceDropdown)}
-            data-tooltip={activeWorkspace.name}
-          >
-            <div className="workspace-avatar">
-              {activeWorkspace.logoUrl ? (
-                <img src={activeWorkspace.logoUrl} alt={activeWorkspace.name} />
-              ) : (
-                activeWorkspace.name.substring(0, 2).toUpperCase()
-              )}
-            </div>
-            <div className="workspace-info">
-              <span className="workspace-name">{activeWorkspace.name}</span>
-              <span className="workspace-role eyebrow">{activeWorkspace.role}</span>
-            </div>
-            <ChevronDown size={14} className="dropdown-arrow" />
-          </button>
+          <Tooltip content={activeWorkspace.name} disabled={sidebarOpen}>
+            <button
+              className="workspace-switcher-btn"
+              onClick={() => sidebarOpen && setShowWorkspaceDropdown(!showWorkspaceDropdown)}
+            >
+              <div className="workspace-avatar">
+                {activeWorkspace.logoUrl ? (
+                  <img src={activeWorkspace.logoUrl} alt={activeWorkspace.name} />
+                ) : (
+                  activeWorkspace.name.substring(0, 2).toUpperCase()
+                )}
+              </div>
+              <div className="workspace-info">
+                <span className="workspace-name">{activeWorkspace.name}</span>
+                <span className="workspace-role eyebrow">{activeWorkspace.role}</span>
+              </div>
+              <ChevronDown size={14} className="dropdown-arrow" />
+            </button>
+          </Tooltip>
 
           {showWorkspaceDropdown && (
             <div className="workspace-dropdown-menu">
@@ -306,14 +313,15 @@ export const AuthenticatedUserLayout: React.FC = () => {
               const isActive = location.pathname === link.path || (link.name === 'Projects' && location.pathname.includes('/projects'));
               return (
                 <li key={link.name}>
-                  <Link
-                    to={link.path}
-                    className={`nav-link ${isActive ? 'active' : ''}`}
-                    data-tooltip={link.name}
-                  >
-                    <Icon size={18} />
-                    <span>{link.name}</span>
-                  </Link>
+                  <Tooltip content={link.name} disabled={sidebarOpen}>
+                    <Link
+                      to={link.path}
+                      className={`nav-link ${isActive ? 'active' : ''}`}
+                    >
+                      <Icon size={18} />
+                      <span>{link.name}</span>
+                    </Link>
+                  </Tooltip>
                 </li>
               );
             })}
@@ -323,22 +331,23 @@ export const AuthenticatedUserLayout: React.FC = () => {
         {/* Sidebar Footer */}
         <div className="sidebar-footer">
           <div className="user-profile-strip" ref={profileDropdownRef}>
-            <button
-              className="user-profile-btn"
-              onClick={() => sidebarOpen && setShowProfileDropdown(!showProfileDropdown)}
-              data-tooltip="Profile Actions"
-            >
-              <img
-                src={user?.avatarUrl || `https://api.dicebear.com/7.x/initials/svg?seed=${user?.name}`}
-                alt={user?.name}
-                className="user-avatar"
-              />
-              <div className="user-info">
-                <span className="user-name">{user?.name}</span>
-                <span className="user-email">{user?.email}</span>
-              </div>
-              <ChevronDown size={14} className="dropdown-arrow" />
-            </button>
+            <Tooltip content="Profile Actions" disabled={sidebarOpen}>
+              <button
+                className="user-profile-btn"
+                onClick={() => sidebarOpen && setShowProfileDropdown(!showProfileDropdown)}
+              >
+                <img
+                  src={user?.avatarUrl || `https://api.dicebear.com/7.x/initials/svg?seed=${user?.name}`}
+                  alt={user?.name}
+                  className="user-avatar"
+                />
+                <div className="user-info">
+                  <span className="user-name">{user?.name}</span>
+                  <span className="user-email">{user?.email}</span>
+                </div>
+                <ChevronDown size={14} className="dropdown-arrow" />
+              </button>
+            </Tooltip>
 
             {showProfileDropdown && (
               <div className="profile-dropdown-menu">

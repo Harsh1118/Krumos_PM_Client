@@ -4,6 +4,7 @@ import { useAuthStore } from '../../../store/authStore';
 import { useWorkspaces } from '../../../context/WorkspaceContext';
 import api from '../../../config/apiConfig';
 import { useVerifyInvite, useAcceptInviteMutation } from '../../../api/auth/useAuthApi';
+import { AuthLayout } from '../../../components/common/AuthLayout';
 import { LogIn, ShieldAlert } from 'lucide-react';
 import type { ApiError } from '../../../types';
 
@@ -79,11 +80,7 @@ export const AcceptInvite: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-slate-950 px-4 relative overflow-hidden">
-      {/* Background glow effects */}
-      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl" />
-      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl" />
-
+    <AuthLayout>
       <div className="w-full max-w-md bg-slate-900/60 backdrop-blur-xl border border-slate-800 p-8 rounded-2xl shadow-2xl relative z-10">
         {error ? (
           /* Error State */
@@ -152,7 +149,7 @@ export const AcceptInvite: React.FC = () => {
           </div>
         ) : null}
       </div>
-    </div>
+    </AuthLayout>
   );
 };
 export default AcceptInvite;
